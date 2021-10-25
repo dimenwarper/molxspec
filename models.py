@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch_geometric.nn as gnn
+import egnn
 
 
 class ResBlock(nn.Module):
@@ -79,3 +80,22 @@ class Mol2SpecGraph(nn.Module):
         gdata = gdata.to(self.meta.device)
         x = self.layers(gdata.x, gdata.edge_index, gdata.batch)
         return x
+
+
+class Mol2SpecEGNN(nn.Module):
+    def __init__(self, molecule_dim: int, prop_dim: int, hdim: int, edge_dim: int, n_layers: int):
+        super().__init__()
+        self.meta = nn.Parameter(torch.empty(0))
+        self.egnn = egnn.EGNN(
+            in_node_nf=molecule_dim, 
+            hidden_nf=hdim,
+            out_node_nf=prop_dim, 
+            in_edge_nf=edge_dim,
+            n_layers=n_layers
+            )
+    
+    def forward(self, gdata):
+        gdata = gdata.to(self.meta.device)
+        x = self.egnn(gdata.x, gdata.pos, gdata.edge_index, gdata.edge_attr)
+        return x
+    

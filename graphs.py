@@ -1,3 +1,6 @@
+'''
+Stiched and forked from some of deepchem and https://www.kaggle.com/hd2019/using-rdkit-and-pyg-for-graph-model-dataset
+'''
 import os
 import torch
 from torch_geometric.data import Data

@@ -26,7 +26,7 @@ def load_models(hparams):
     print('Loading models...')
     _models = {}
     for hdim in hparams['hdim']:
-        _models[f'graphconv_{hdim}'] = models.Mol2SpecGraph(
+        _models[f'graphconv_w_batchnorm_{hdim}'] = models.Mol2SpecGraph(
                 molecule_dim=graphs.NUM_NODE_FEATURES,
                 prop_dim=utils.SPECTRA_DIM,
                 hdim=hdim
