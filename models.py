@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch_geometric.nn as gnn
 import egnn
+import utils
+from transformers import AutoModelWithLMHead
+from itertools import chain
 
 
 class ResBlock(nn.Module):
@@ -14,38 +17,25 @@ class ResBlock(nn.Module):
 
 
 class Mol2SpecSimple(nn.Module):
-    def __init__(self, molecule_dim: int, prop_dim: int, hdim: int = 1000):
+    def __init__(self, molecule_dim: int, prop_dim: int, hdim: int, n_layers: int):
         super().__init__()
         self.meta = nn.Parameter(torch.empty(0))
         self.molecule_dim = molecule_dim
         self.prop_dim = prop_dim
-        nl = nn.SiLU()
         dropout_p = 0.1
+        reslayers = [
+            ResBlock(
+                nn.Sequential(
+                    nn.Dropout(p=dropout_p),
+                    nn.Linear(molecule_dim, hdim),
+                    nn.SiLU(),
+                    nn.Linear(hdim, molecule_dim),
+                )
+            )
+            for _ in range(n_layers)
+        ]
         self.mlp_layers = nn.Sequential(
-            ResBlock(
-                nn.Sequential(
-                    nn.Dropout(p=dropout_p),
-                    nn.Linear(molecule_dim, hdim),
-                    nl,
-                    nn.Linear(hdim, molecule_dim),
-                )
-            ),
-            ResBlock(
-                nn.Sequential(
-                    nn.Dropout(p=dropout_p),
-                    nn.Linear(molecule_dim, hdim),
-                    nl,
-                    nn.Linear(hdim, molecule_dim),
-                )
-            ),
-            ResBlock(
-                nn.Sequential(
-                    nn.Dropout(p=dropout_p),
-                    nn.Linear(molecule_dim, hdim),
-                    nl,
-                    nn.Linear(hdim, molecule_dim),
-                )
-            ),
+            *reslayers,
             nn.Linear(molecule_dim, prop_dim),
         )
 
@@ -58,22 +48,30 @@ class Mol2SpecSimple(nn.Module):
 
 
 class Mol2SpecGraph(nn.Module):
-    def __init__(self, molecule_dim: int, prop_dim: int, hdim: int = 32):
+    def __init__(self, molecule_dim: int, prop_dim: int, hdim: int, n_layers: int):
         super().__init__()
         self.meta = nn.Parameter(torch.empty(0))
 
-        self.layers = gnn.Sequential('x, edge_index, batch', [
-            (gnn.GCNConv(molecule_dim, hdim), 'x, edge_index -> x1'),
-            nn.ReLU(inplace=True),
-            (gnn.GCNConv(hdim, hdim), 'x1, edge_index -> x2'),
-            nn.ReLU(inplace=True),
-            (lambda x1, x2: [x1, x2], 'x1, x2 -> xs'),
-            (gnn.JumpingKnowledge('cat', hdim, num_layers=2), 'xs -> x'),
-            (gnn.global_add_pool, 'x, batch -> x'),
-            nn.Linear(hdim * 2, hdim // 2),
-            nn.Dropout(p=0.2),
-            nn.Linear(hdim // 2, prop_dim),
-            ])
+        gcn_layers = []
+        for _ in range(n_layers):
+            gcn_layers += [
+                (gnn.GCNConv(molecule_dim, hdim), 'x, edge_index -> x1'),
+                nn.ReLU(inplace=True),
+                (gnn.GCNConv(hdim, hdim), 'x1, edge_index -> x2'),
+                nn.ReLU(inplace=True),
+                (lambda x1, x2: [x1, x2], 'x1, x2 -> xs'),
+                (gnn.JumpingKnowledge('cat', hdim, num_layers=2), 'xs -> x'),
+                (gnn.global_add_pool, 'x, batch -> x')
+            ]
+
+        self.layers = gnn.Sequential(
+            'x, edge_index, batch',
+            gcn_layers + [
+                nn.Linear(hdim * 2, hdim),
+                nn.Dropout(p=0.2),
+                nn.Linear(hdim, prop_dim),
+            ]
+        )
 
 
     def forward(self, gdata):
@@ -89,13 +87,42 @@ class Mol2SpecEGNN(nn.Module):
         self.egnn = egnn.EGNN(
             in_node_nf=molecule_dim, 
             hidden_nf=hdim,
-            out_node_nf=prop_dim, 
+            out_node_nf=hdim, 
             in_edge_nf=edge_dim,
             n_layers=n_layers
             )
-    
+
+        self.end_layers = gnn.Sequential('x, batch', [
+            (gnn.global_add_pool, 'x, batch -> x'),
+            nn.Linear(hdim, hdim),
+            nn.Dropout(p=0.2),
+            nn.Linear(hdim, prop_dim),
+            ])
+
     def forward(self, gdata):
         gdata = gdata.to(self.meta.device)
-        x = self.egnn(gdata.x, gdata.pos, gdata.edge_index, gdata.edge_attr)
+        x, _ = self.egnn(gdata.x, gdata.pos, gdata.edge_index, gdata.edge_attr)
+        x = self.end_layers(x, gdata.batch)
         return x
+
+
+class Mol2SpecBERT(nn.Module):
+    def __init__(self, prop_dim: int, hdim: int, n_layers: int):
+        super().__init__()
+        self.meta = nn.Parameter(torch.empty(0))
+        self.pretrained = AutoModelWithLMHead.from_pretrained(utils.CHEMBERTA_MODEL)
+        for param in self.pretrained.parameters():
+            param.requires_grad = False
+        self.in_dim = int(self.pretrained.lm_head.dense.in_features)
+        self.head = nn.Sequential(
+            nn.Linear(self.in_dim, hdim),
+            nn.SiLU(),
+            *chain(*[(nn.Linear(hdim, hdim), nn.SiLU()) for _ in range(n_layers)]), 
+            nn.Linear(hdim, prop_dim)
+        )
     
+    def forward(self, x):
+        x = {k: v.to(self.meta.device).squeeze(dim=1) for k, v in x.items()}
+        x = self.pretrained(**x, output_hidden_states=True).hidden_states[-1].mean(axis=1)
+        x = self.head(x)
+        return x

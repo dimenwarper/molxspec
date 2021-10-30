@@ -63,6 +63,9 @@ ATOM_TYPES = [
 # plus other 8 features (aromatic, acceptor, etc, see node_features)
 NUM_NODE_FEATURES = len(ATOM_TYPES) + 1 + 8
 
+# 4 Bond types, see edge_features
+NUM_EDGE_FEATURES = 4
+
 fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
 CHEM_FEATURE_FACTORY = ChemicalFeatures.BuildFeatureFactory(fdef_name)
 
@@ -139,13 +142,19 @@ def mol_to_nx(mol):
     return g
 
 
-def mol_to_torch_geom(mol):
+def mol_to_torch_geom(mol, add_positions: bool = False):
     g = mol_to_nx(mol)
     node_attr = node_features(g)
     edge_index, edge_attr = edge_features(g)
+    if add_positions:
+        conformer = list(mol.GetConformers())[0]
+        pos = torch.FloatTensor(conformer.GetPositions())
+    else:
+        pos = None
     data = Data(
             x=node_attr,
             edge_index=edge_index,
             edge_attr=edge_attr,
+            pos=pos
             )
     return data

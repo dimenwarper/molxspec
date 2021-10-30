@@ -26,18 +26,21 @@ def load_models(hparams):
     print('Loading models...')
     _models = {}
     for hdim in hparams['hdim']:
-        _models[f'graphconv_w_batchnorm_{hdim}'] = models.Mol2SpecGraph(
-                molecule_dim=graphs.NUM_NODE_FEATURES,
-                prop_dim=utils.SPECTRA_DIM,
-                hdim=hdim
-                )
+        for n_layers in hparams['n_layers']:
+            _models[f'graphconv_w_batchnorm_{hdim}'] = models.Mol2SpecGraph(
+                    molecule_dim=graphs.NUM_NODE_FEATURES,
+                    prop_dim=utils.SPECTRA_DIM,
+                    hdim=hdim,
+                    n_layers=n_layers
+                    )
     return _models
 
 
 def main():
     hparams = {
-            'hdim': [128, 256, 512],
-            'batch_size': [16, 32]
+            'hdim': [256, 512, 1024],
+            'batch_size': [16, 32],
+            'n_layers': [1, 2, 3]
             }
     dataset = load_dataset()
     _models = load_models(hparams)
@@ -52,7 +55,7 @@ def main():
                     dataset=dataset,
                     outdir=f'runs/{setup_name}',
                     batch_size=bsz,
-                    n_epochs=100,
+                    n_epochs=50,
                     optimizer=optim.Adam,
                     dataloader=torch_geometric.loader.DataLoader
                     )
