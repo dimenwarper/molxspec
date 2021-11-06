@@ -15,8 +15,8 @@ def load_dataset():
             'data/pos_processed_gnps_shuffled_with_3d_train.tsv',
             parser=utils.gnps_parser,
             mol_representation=utils.chemberta_tokenize,
-            #from_mol=0,
-            #to_mol=10,
+            from_mol=0,
+            to_mol=50000,
             )
 
 
@@ -35,9 +35,9 @@ def load_models(hparams):
 
 def main():
     hparams = {
-            'hdim': [512, 1024, 2048],
-            'batch_size': [16, 32],
-            'n_layers': [3, 5]
+            'hdim': [512, 1024],
+            'batch_size': [64],
+            'n_layers': [2, 3]
             }
     dataset = load_dataset()
     _models = load_models(hparams)
@@ -54,7 +54,8 @@ def main():
                     batch_size=bsz,
                     n_epochs=50,
                     optimizer=optim.Adam,
-                    dataloader=torch.utils.data.DataLoader
+                    dataloader=torch.utils.data.DataLoader,
+                    #device='cpu'
                     )
 
     pbar = tqdm(list(setups.items()))

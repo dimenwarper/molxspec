@@ -10,8 +10,36 @@ from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+import argparse
 
 import utils
+
+
+def cli(scan_hparams, prod_hparams):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--prod', action='store_true', default=False)
+    args = parser.parse_args()
+    if args.prod:
+        print('+++ This is a *prod* run +++')
+        setup_args = {
+            #'scheduler': lambda *args, **kwargs: optim.lr_scheduler.OneCycleLR(*args, 1e-3, **kwargs),
+            'scheduler': None,
+            'swa': False,
+            'n_epochs': 200,
+            'save_model': True
+        }
+        hparams = prod_hparams
+    else:
+        print('+++ This is a scanning run +++')
+        setup_args = {
+            'save_model': True,
+            'n_epochs': 50,
+            'swa': False,
+            'scheduler': None
+        }
+        hparams = scan_hparams
+    return setup_args, args, hparams
+
 
 def clear_device():
     torch.cuda.empty_cache()
@@ -19,11 +47,12 @@ def clear_device():
 
 def setup_device():
     if torch.cuda.is_available():
-        dev = "cuda:0"
+        dev = 'cuda:0'
     else:
-        dev = "cpu"
+        dev = 'cpu'
     device = torch.device(dev)
     return device
+
 
 def split_dataset(dataset):
     train_size = int(len(dataset) * 0.8)
@@ -41,18 +70,25 @@ class TrainingSetup:
             n_epochs = 100,
             lr = 3e-4,
             batch_size = 300,
-            optimizer = boptim.Adam8bit,
-            dataloader = DataLoader
+            optimizer = optim.Adam,
+            dataloader = DataLoader,
+            device = None,
+            scheduler = None,
+            swa = False,
+            save_model = False, 
             ):
         self.model = model
         self.batch_size = batch_size
         self.lr = lr
         self.n_epochs = n_epochs
+        self.save_model = save_model
+        self.swa = swa
+        self.scheduler = scheduler
         self.train_data, self.test_data, self.validation_data = split_dataset(dataset)
 
         self.train_loader = dataloader(self.train_data, batch_size=self.batch_size, shuffle=True)
         self.test_loader = dataloader(self.test_data, batch_size=self.batch_size)
-        self.device = setup_device()
+        self.device = setup_device() if device is None else device
         self.outdir = outdir
         os.makedirs(self.outdir, exist_ok=True)
         self.optimizer = optimizer
@@ -63,6 +99,14 @@ class TrainingSetup:
         self.model = self.model.to(self.device)
         criterion = nn.MSELoss()
         optimizer = self.optimizer(self.model.parameters(), lr=self.lr)
+        if self.scheduler is not None:
+            scheduler = self.scheduler(
+                optimizer, 
+                epochs=self.n_epochs, 
+                steps_per_epoch=len(self.train_loader)
+                )
+        else:
+            scheduler = None
 
         losses = {'train': {}, 'test': {}}
         state_to_save = {'loss': np.inf}
@@ -77,6 +121,8 @@ class TrainingSetup:
                         )
                 loss.backward()
                 optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
 
                 losses['train'][epoch] += loss.item() / len(self.train_loader)
 
@@ -87,13 +133,17 @@ class TrainingSetup:
                             targets.float().to(self.device)
                             )
                     losses['test'][epoch] += loss.item() / len(self.test_loader)
-                    if losses['test'][epoch] < state_to_save['loss']:
+                    if True:#losses['test'][epoch] < state_to_save['loss']:
                         state_to_save['epoch'] = epoch
                         state_to_save['model_state_dict'] = self.model.state_dict()
-                        #state_to_save['optimizer_state_dict'] = optimizer.state_dict()
+                        state_to_save['model_kwargs'] = self.model.kwargs
+                        if self.save_model:
+                            state_to_save['optimizer_state_dict'] = optimizer.state_dict()
                         state_to_save['loss'] = losses['test'][epoch]
 
-        #torch.save(state_to_save, f'{self.outdir}/best_checkpoint.pt')
+        if self.save_model:
+            print(f'Epoch that was checkpointed: {state_to_save["epoch"]}')
+            torch.save(state_to_save, f'{self.outdir}/best_checkpoint.pt')
         return losses
 
 

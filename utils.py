@@ -10,16 +10,15 @@ from rdkit.Chem import DataStructs
 from enum import Enum
 import numpy as np
 from typing import Callable, List, Any, Optional, Tuple, Dict, Collection, Union
-from matplotlib import pyplot as plt
 import linecache
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
 MAX_MZ = 2000
 RANDOM_SEED = 43242
-FINGERPRINT_NBITS = 4096
+FINGERPRINT_NBITS = 1024
 CHEMBERTA_MODEL = 'seyonec/ChemBERTa-zinc-base-v1'
-CHEMBERTA_MAX_LEN = 514 # Got this by inspecting the .roberta model of the above model
+CHEMBERTA_MAX_LEN = 300 # Natural products aren't that large
 __CHEMBERTA_TOKENIZER = None
 
 SPECTRA_DIM = MAX_MZ * 2
@@ -44,7 +43,8 @@ def chemberta_tokenize(mol) -> np.array:
         Chem.MolToSmiles(mol), 
         return_tensors='pt',
         padding='max_length',
-        max_length=CHEMBERTA_MAX_LEN
+        max_length=CHEMBERTA_MAX_LEN,
+        truncation=True
         )
 
 
@@ -55,10 +55,19 @@ def encode_spec(spec):
         if mz_rnd >= MAX_MZ:
             continue
         logint= np.log10(spec[i, 1] + 1)
-        if vec[mz_rnd] == 0 or vec[mz_rnd] < logint:
+        if vec[mz_rnd] < logint:
             vec[mz_rnd] = logint
             vec[MAX_MZ + mz_rnd] = np.log10((spec[i, 0] - mz_rnd) + 1)
     return vec
+
+
+def decode_spec(flatspec: np.array, lowest_intensity: float = 0) -> np.array:
+    intensities = flatspec[:len(flatspec) // 2]
+    spln = sum(intensities > lowest_intensity)
+    spec = np.zeros([spln, 2])
+    spec[:, 1] = 10**(intensities[intensities > lowest_intensity]) - 1
+    spec[:, 0] = np.where(intensities > lowest_intensity)[0] + (10**(flatspec[len(flatspec) // 2:][intensities > lowest_intensity]) - 1)
+    return spec
 
 
 def gnps_parser(fname: str, from_mol: int = 0, to_mol: Optional[int] = None) -> List[Any]:
@@ -102,19 +111,11 @@ def parse_spectra(line):
     # Round to 3 digits M/Z precision
     spec[:, 0] = np.round(spec[:, 0], 3)
     # We'll predict relative intensities
-    #spec[:, 1] /= spec[:, 1].max()
+    spec[:, 1] /= spec[:, 1].max()
     mol = Chem.MolFromSmiles(smiles)
     return mol, encode_spec(spec)
 
 
-
-def decode_spec(flatspec: np.array) -> np.array:
-    intensities = flatspec[:len(flatspec) // 2]
-    spln = sum(intensities > 0)
-    spec = np.zeros([spln, 2])
-    spec[:, 1] = 10**(intensities[intensities > 0]) - 1
-    spec[:, 0] = np.where(intensities > 0)[0] + (10**(flatspec[len(flatspec) // 2:][intensities > 0]) - 1)
-    return spec
 
 
 class Mol2PropertiesDataset(Dataset):

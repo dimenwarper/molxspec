@@ -19,11 +19,18 @@ class ResBlock(nn.Module):
 class Mol2SpecSimple(nn.Module):
     def __init__(self, molecule_dim: int, prop_dim: int, hdim: int, n_layers: int):
         super().__init__()
+        self.kwargs = dict(
+            molecule_dim=molecule_dim,
+            prop_dim=prop_dim,
+            hdim=hdim,
+            n_layers=n_layers
+        )
+
         self.meta = nn.Parameter(torch.empty(0))
         self.molecule_dim = molecule_dim
         self.prop_dim = prop_dim
         dropout_p = 0.1
-        reslayers = [
+        res_blocks = [
             ResBlock(
                 nn.Sequential(
                     nn.Dropout(p=dropout_p),
@@ -35,7 +42,7 @@ class Mol2SpecSimple(nn.Module):
             for _ in range(n_layers)
         ]
         self.mlp_layers = nn.Sequential(
-            *reslayers,
+            *res_blocks,
             nn.Linear(molecule_dim, prop_dim),
         )
 
@@ -50,25 +57,30 @@ class Mol2SpecSimple(nn.Module):
 class Mol2SpecGraph(nn.Module):
     def __init__(self, molecule_dim: int, prop_dim: int, hdim: int, n_layers: int):
         super().__init__()
+        self.kwargs = dict(
+            molecule_dim=molecule_dim,
+            prop_dim=prop_dim,
+            hdim=hdim,
+            n_layers=n_layers
+        )
         self.meta = nn.Parameter(torch.empty(0))
 
         gcn_layers = []
         for _ in range(n_layers):
             gcn_layers += [
-                (gnn.GCNConv(molecule_dim, hdim), 'x, edge_index -> x1'),
+                (gnn.GCNConv(hdim, hdim), 'x, edge_index -> x'),
                 nn.ReLU(inplace=True),
-                (gnn.GCNConv(hdim, hdim), 'x1, edge_index -> x2'),
-                nn.ReLU(inplace=True),
-                (lambda x1, x2: [x1, x2], 'x1, x2 -> xs'),
-                (gnn.JumpingKnowledge('cat', hdim, num_layers=2), 'xs -> x'),
-                (gnn.global_add_pool, 'x, batch -> x')
+                #(lambda x1, x2: [x1, x2], 'x1, x2 -> xs'),
+                #(gnn.JumpingKnowledge('cat', hdim, num_layers=2), 'xs -> x'),
             ]
 
         self.layers = gnn.Sequential(
             'x, edge_index, batch',
-            gcn_layers + [
-                nn.Linear(hdim * 2, hdim),
-                nn.Dropout(p=0.2),
+            [
+                (gnn.GCNConv(molecule_dim, hdim), 'x, edge_index -> x'),
+                nn.ReLU(inplace=True),
+            ] + gcn_layers + [
+                (gnn.global_max_pool, 'x, batch -> x'),
                 nn.Linear(hdim, prop_dim),
             ]
         )
@@ -83,7 +95,16 @@ class Mol2SpecGraph(nn.Module):
 class Mol2SpecEGNN(nn.Module):
     def __init__(self, molecule_dim: int, prop_dim: int, hdim: int, edge_dim: int, n_layers: int):
         super().__init__()
+        self.kwargs = dict(
+            molecule_dim=molecule_dim,
+            prop_dim=prop_dim,
+            hdim=hdim,
+            edge_dim=edge_dim,
+            n_layers=n_layers,
+        )
         self.meta = nn.Parameter(torch.empty(0))
+        dropout_p = 0.1
+
         self.egnn = egnn.EGNN(
             in_node_nf=molecule_dim, 
             hidden_nf=hdim,
@@ -92,10 +113,21 @@ class Mol2SpecEGNN(nn.Module):
             n_layers=n_layers
             )
 
+        res_blocks = [
+            ResBlock(
+                nn.Sequential(
+                    nn.Dropout(p=dropout_p),
+                    nn.Linear(hdim, hdim),
+                    nn.SiLU(),
+                    nn.Linear(hdim, hdim),
+                )
+            )
+            for _ in range(2)
+        ]
+
         self.end_layers = gnn.Sequential('x, batch', [
-            (gnn.global_add_pool, 'x, batch -> x'),
-            nn.Linear(hdim, hdim),
-            nn.Dropout(p=0.2),
+            (gnn.global_max_pool, 'x, batch -> x'),
+            *res_blocks,
             nn.Linear(hdim, prop_dim),
             ])
 
@@ -109,6 +141,11 @@ class Mol2SpecEGNN(nn.Module):
 class Mol2SpecBERT(nn.Module):
     def __init__(self, prop_dim: int, hdim: int, n_layers: int):
         super().__init__()
+        self.kwargs = dict(
+            prop_dim=prop_dim,
+            hdim=hdim,
+            n_layers=n_layers,
+        )
         self.meta = nn.Parameter(torch.empty(0))
         self.pretrained = AutoModelWithLMHead.from_pretrained(utils.CHEMBERTA_MODEL)
         for param in self.pretrained.parameters():

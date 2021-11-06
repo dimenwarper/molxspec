@@ -1,7 +1,7 @@
 import utils
 import models
 import graphs
-from training_setup import TrainingSetup
+from training_setup import TrainingSetup, cli
 import torch_geometric
 import models
 from torch import optim
@@ -20,8 +20,8 @@ def load_dataset():
             parser=utils.gnps_parser_3d,
             mol_representation=graphs.mol_to_torch_geom,
             #from_mol=0,
-            #to_mol=100,
-            use_cache=True,
+            #to_mol=1000,
+            #use_cache=True,
             mol_rep_kwargs={'add_positions': True}
             )
 
@@ -40,29 +40,37 @@ def load_models(hparams):
                     )
     return _models
 
+SCAN_HPARAMS = {
+            'hdim': [1024],
+            'batch_size': [32, 64, 128],
+            'n_layers': [1, 2, 3, 4]
+}
+
+PROD_HPARAMS = {
+    'hdim': [1024],
+    'n_layers': [2],
+    'batch_size': [32]
+}
 
 def main():
-    hparams = {
-            'hdim': [256, 512, 1024],
-            'batch_size': [16, 32],
-            'n_layers': [3, 5]
-            }
+    setup_args, clargs, hparams = cli(SCAN_HPARAMS, PROD_HPARAMS)
     dataset = load_dataset()
     _models = load_models(hparams)
+    setup_args['n_epochs'] = min(100, setup_args['n_epochs'])
 
 
     setups = {}
     for bsz in hparams['batch_size']:
         for mname, model in _models.items():
-            setup_name = f'model_{mname}_bs_{bsz}_adam'
+            suffix = '_prod' if clargs.prod else ''
+            setup_name = f'model_{mname}_bs_{bsz}_adam{suffix}'
             setups[setup_name] = TrainingSetup(
                     model=model,
                     dataset=dataset,
                     outdir=f'runs/{setup_name}',
                     batch_size=bsz,
-                    n_epochs=50,
-                    optimizer=optim.Adam,
-                    dataloader=torch_geometric.loader.DataLoader
+                    dataloader=torch_geometric.loader.DataLoader,
+                    **setup_args
                     )
 
     pbar = tqdm(list(setups.items()))

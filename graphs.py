@@ -8,6 +8,7 @@ from torch_geometric.data import InMemoryDataset
 from rdkit import Chem
 from rdkit.Chem import ChemicalFeatures
 from rdkit import RDConfig
+import numpy as np
 import networkx as nx
 import pathlib
 import pandas as pd
@@ -60,8 +61,8 @@ ATOM_TYPES = [
         ]
 
 # Number of features is one hot per atom type + unknown
-# plus other 8 features (aromatic, acceptor, etc, see node_features)
-NUM_NODE_FEATURES = len(ATOM_TYPES) + 1 + 8
+# plus other features (aromatic, acceptor, etc, see node_features)
+NUM_NODE_FEATURES = 108
 
 # 4 Bond types, see edge_features
 NUM_EDGE_FEATURES = 4
@@ -76,7 +77,7 @@ def node_features(g):
         # Atom type (One-hot) 
         h_t += [int(d['a_type'] == x) for x in ATOM_TYPES] + [1 if d['a_type'] not in ATOM_TYPES else 0]
         # Atomic number
-        h_t.append(d['a_num'])
+        h_t += [int(d['a_num'] == x) for x in 1 + np.arange(30)] + [1 if d['a_num'] > 30 else 0]
         # Acceptor
         h_t.append(d['acceptor'])
         # Donor
@@ -88,7 +89,15 @@ def node_features(g):
                 for x in (Chem.rdchem.HybridizationType.SP, \
                     Chem.rdchem.HybridizationType.SP2,
                     Chem.rdchem.HybridizationType.SP3)]
-        h_t.append(d['num_h'])
+        # Num hydrogens
+        h_t += [int(d['num_h'] == x) for x in np.arange(5)] + [1 if d['num_h'] > 4 else 0]
+        # Charge
+        h_t.append(int(d['formal_charge']))
+        h_t.append(int(d['num_rad_ele']))
+        # Degree
+        h_t += [int(d['deg'] == x) for x in 1 + np.arange(10)] + [1 if d['deg'] > 10 else 0]
+        # Implicit Valence
+        h_t += [int(d['imp_valence'] == x) for x in np.arange(7)] + [1 if d['imp_valence'] > 6 else 0]
         feat.append((n, h_t))
     feat.sort(key=lambda item: item[0])
     node_attr = torch.FloatTensor([item[1] for item in feat])
@@ -120,9 +129,20 @@ def mol_to_nx(mol):
     g = nx.DiGraph()
     for i in range(mol.GetNumAtoms()):
         atom_i = mol.GetAtomWithIdx(i)
-        g.add_node(i, a_type=atom_i.GetSymbol(), a_num=atom_i.GetAtomicNum(), acceptor=0, donor=0,
-                aromatic=atom_i.GetIsAromatic(), hybridization=atom_i.GetHybridization(),
-                num_h=atom_i.GetTotalNumHs())
+        g.add_node(
+            i, 
+            a_type=atom_i.GetSymbol(), 
+            a_num=atom_i.GetAtomicNum(), 
+            acceptor=0, 
+            donor=0,
+            aromatic=atom_i.GetIsAromatic(), 
+            hybridization=atom_i.GetHybridization(),
+            num_h=atom_i.GetTotalNumHs(),
+            imp_valence=atom_i.GetImplicitValence(),
+            formal_charge=atom_i.GetFormalCharge(),
+            num_rad_ele=atom_i.GetNumRadicalElectrons(),
+            deg=atom_i.GetDegree(),
+            )
 
     for i in range(len(feats)):
         if feats[i].GetFamily() == 'Donor':
