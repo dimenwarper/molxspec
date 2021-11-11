@@ -11,7 +11,7 @@ from tqdm import tqdm
 def load_dataset():
     print('Loading dataset...')
 
-    return utils.Mol2PropertiesDataset(
+    return utils.Mol2SpecDataset(
             'egnn_gnps',
             (
                 'data/pos_processed_gnps_shuffled_with_3d_train.tsv',
@@ -32,7 +32,8 @@ def load_models(hparams):
     for hdim in hparams['hdim']:
         for n_layers  in hparams['n_layers']:
             _models[f'egnn_hdim_{hdim}_layers_{n_layers}'] = models.Mol2SpecEGNN(
-                    molecule_dim=graphs.NUM_NODE_FEATURES,
+                    node_feature_dim=graphs.NUM_NODE_FEATURES,
+                    graph_feature_dim=len(utils.FRAGMENT_LEVELS) + len(utils.ADDUCTS),
                     prop_dim=utils.SPECTRA_DIM,
                     hdim=hdim,
                     edge_dim=graphs.NUM_EDGE_FEATURES,
@@ -49,14 +50,16 @@ SCAN_HPARAMS = {
 PROD_HPARAMS = {
     'hdim': [1024],
     'n_layers': [2],
-    'batch_size': [32]
+    'batch_size': [64]
 }
 
 def main():
     setup_args, clargs, hparams = cli(SCAN_HPARAMS, PROD_HPARAMS)
     dataset = load_dataset()
     _models = load_models(hparams)
-    setup_args['n_epochs'] = min(100, setup_args['n_epochs'])
+    setup_args['n_epochs'] = min(50, setup_args['n_epochs'])
+    #if clargs.prod:
+    #    setup_args['checkpoint'] = 'runs/model_egnn_hdim_1024_layers_2_bs_32_adam/best_checkpoint.pt'
 
 
     setups = {}

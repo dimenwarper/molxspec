@@ -5,22 +5,23 @@ import torch
 from torch.utils.data import Dataset
 from typing import Optional
 from rdkit import Chem
+from rdkit.Chem.Descriptors import ExactMolWt
 from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
-from enum import Enum
 import numpy as np
 from typing import Callable, List, Any, Optional, Tuple, Dict, Collection, Union
-import linecache
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
 MAX_MZ = 2000
+ADDUCTS = ['[M+H]+', '[M+Na]+', 'M+H', 'M-H', '[M-H2O+H]+', '[M-H]-', '[M+NH4]+', 'M+NH4', 'M+Na']
 RANDOM_SEED = 43242
 FINGERPRINT_NBITS = 1024
 CHEMBERTA_MODEL = 'seyonec/ChemBERTa-zinc-base-v1'
 CHEMBERTA_MAX_LEN = 300 # Natural products aren't that large
 __CHEMBERTA_TOKENIZER = None
-
+MAX_ION_SHIFT = 25
+FRAGMENT_LEVELS = [-4, -3, -2, -1, 0]
 SPECTRA_DIM = MAX_MZ * 2
 
 
@@ -31,13 +32,6 @@ def chemberta_tokenizer() -> AutoTokenizer:
     return __CHEMBERTA_TOKENIZER
 
 
-def fingerprint(mol, nbits=FINGERPRINT_NBITS) -> np.array:
-    fp = AllChem.GetHashedMorganFingerprint(mol, 2, nBits=nbits)
-    mol_rep = np.zeros((0,))
-    DataStructs.ConvertToNumpyArray(fp, mol_rep)
-    return mol_rep
-
-
 def chemberta_tokenize(mol) -> np.array:
     return chemberta_tokenizer()(
         Chem.MolToSmiles(mol), 
@@ -46,6 +40,25 @@ def chemberta_tokenize(mol) -> np.array:
         max_length=CHEMBERTA_MAX_LEN,
         truncation=True
         )
+
+
+def get_fragmentation_level(mol, spec):
+    mass = ExactMolWt(mol)
+    min_mass, max_mass = int(max(0, mass - MAX_ION_SHIFT)), int(min(mass + MAX_ION_SHIFT, MAX_MZ))
+    _spec = 10 ** spec - 1
+    frag_level = max(0.01, _spec[min_mass:max_mass + 1].sum())
+    return np.log10(frag_level / _spec.sum())
+
+
+def get_featurized_adducts(adduct):
+    return np.array([int(adduct == ADDUCTS[i]) for i in range(len(ADDUCTS))])
+
+
+def get_featurized_fragmentation_level(mol, spec):
+    fl = get_fragmentation_level(mol, spec)
+    flf = [int(fl <= FRAGMENT_LEVELS[0])] 
+    flf += [int(FRAGMENT_LEVELS[i-1] <= fl <= FRAGMENT_LEVELS[i]) for i in range(1, len(FRAGMENT_LEVELS))]
+    return np.array(flf)
 
 
 def encode_spec(spec):
@@ -70,22 +83,32 @@ def decode_spec(flatspec: np.array, lowest_intensity: float = 0) -> np.array:
     return spec
 
 
+def fingerprint(mol, frag_levels, adduct_feats, nbits=FINGERPRINT_NBITS) -> np.array:
+    fp = AllChem.GetHashedMorganFingerprint(mol, 2, nBits=nbits)
+    mol_rep = np.zeros((0,))
+    DataStructs.ConvertToNumpyArray(fp, mol_rep)
+    return np.hstack([mol_rep, frag_levels, adduct_feats])
+
+
 def gnps_parser(fname: str, from_mol: int = 0, to_mol: Optional[int] = None) -> List[Any]:
     molecules = []
     spectra = []
+    adducts = []
     with open(fname) as fl:
         for i, line in tqdm(list(enumerate(fl.readlines()[from_mol:]))):
             if to_mol is not None and from_mol + i >=  to_mol:
                 break
-            mol, spec = parse_spectra(line)
+            _, adduct, mol, spec = parse_spectra(line)
             molecules.append(mol)
             spectra.append(spec)
-    return molecules, spectra
+            adducts.append(adduct)
+    return molecules, adducts, spectra
 
 
 def gnps_parser_3d(fnames: Tuple[str, str], from_mol: int = 0, to_mol: Optional[int] = None) -> List[Any]:
     molecules = []
     spectra = []
+    adducts = []
     spectra_fname, sdf_fname = fnames
 
     for i, mol in enumerate(Chem.SDMolSupplier(sdf_fname)):
@@ -97,13 +120,14 @@ def gnps_parser_3d(fnames: Tuple[str, str], from_mol: int = 0, to_mol: Optional[
         for i, line in tqdm(list(enumerate(fl.readlines()[from_mol:]))):
             if to_mol is not None and from_mol + i >=  to_mol:
                 break
-            _, spec = parse_spectra(line)
+            _, adduct, _, spec = parse_spectra(line)
+            adducts.append(adduct)
             spectra.append(spec)
-    return molecules[:len(spectra)], spectra
+    return molecules[:len(spectra)], adducts, spectra
 
 
 def parse_spectra(line):
-    spec_str, smiles = line.strip().split('\t')
+    sid, adduct, spec_str, smiles = line.strip().split('\t')
     spec = np.array(json.loads(spec_str))
     if not( len(spec.shape) == 2 and spec.shape[0] >= 10 and (spec <= 0).sum() == 0):
         print(spec)
@@ -113,17 +137,17 @@ def parse_spectra(line):
     # We'll predict relative intensities
     spec[:, 1] /= spec[:, 1].max()
     mol = Chem.MolFromSmiles(smiles)
-    return mol, encode_spec(spec)
+    return sid, adduct, mol, encode_spec(spec)
 
 
-
-
-class Mol2PropertiesDataset(Dataset):
+class Mol2SpecDataset(Dataset):
     SAVED_PROPS = [
             'molecules',
-            'properties',
+            'spectra',
+            'frag_levels',
+            'adducts',
+            'adduct_feats',
             'mol_reps',
-            'property_names'
     ]
 
     SAVE_DIR = 'data'
@@ -136,7 +160,6 @@ class Mol2PropertiesDataset(Dataset):
         mol_representation: Callable = fingerprint,
         from_mol: int = 0,
         to_mol: Optional[int] = None,
-        property_names: Optional[List[str]] = None,
         use_cache: bool = False,
         mol_rep_kwargs: Optional[Dict[str, Any]] = None,
     ):
@@ -145,13 +168,16 @@ class Mol2PropertiesDataset(Dataset):
             print('Cache found, loading dataset')
             self.load()
         else:
-            self.molecules, self.properties = parser(fnames, from_mol=from_mol, to_mol=to_mol)
-            self.property_names = property_names
+            self.molecules, self.adducts, self.spectra = parser(fnames, from_mol=from_mol, to_mol=to_mol)
+            self.frag_levels = [get_featurized_fragmentation_level(mol, spec) for mol, spec in zip(self.molecules, self.spectra)]
+            self.adduct_feats = [get_featurized_adducts(adduct) for adduct in self.adducts]
             self.mol_representation = mol_representation
             self.mol_rep_kwargs = mol_rep_kwargs if mol_rep_kwargs is not None else {}
 
-            self.mol_reps = [self.mol_representation(mol, **self.mol_rep_kwargs) for mol in tqdm(self.molecules)]
-
+            self.mol_reps = [
+                self.mol_representation(mol, frag_levels=self.frag_levels[i], adduct_feats=self.adduct_feats[i], **self.mol_rep_kwargs) 
+                for i, mol in tqdm(list(enumerate(self.molecules)), desc='Calculating mol reps')
+                ]
 
             if use_cache:
                 print('Caching dataset')
@@ -159,16 +185,16 @@ class Mol2PropertiesDataset(Dataset):
 
     @property
     def cache_fname(self):
-        return os.path.join(Mol2PropertiesDataset.SAVE_DIR, self.dataset_name + '.pkl')
+        return os.path.join(Mol2SpecDataset.SAVE_DIR, self.dataset_name + '.pkl')
 
     def is_cached(self):
         return os.path.exists(self.cache_fname)
 
     def save(self):
         with open(self.cache_fname, 'wb') as fl:
-            pickle.dump({k: getattr(self, k) for k in Mol2PropertiesDataset.SAVED_PROPS}, fl)
+            pickle.dump({k: getattr(self, k) for k in Mol2SpecDataset.SAVED_PROPS}, fl)
             # Weird torch_geometric bug that needs to reload pickled object to regenerate globalstorage
-            for k in Mol2PropertiesDataset.SAVED_PROPS:
+            for k in Mol2SpecDataset.SAVED_PROPS:
                 delattr(self, k)
             self.load()
 
@@ -182,4 +208,4 @@ class Mol2PropertiesDataset(Dataset):
         return len(self.mol_reps)
 
     def __getitem__(self, idx: int):
-        return self.mol_reps[idx], torch.FloatTensor(self.properties[idx])
+        return self.mol_reps[idx], torch.FloatTensor(self.spectra[idx])

@@ -10,7 +10,7 @@ from tqdm import tqdm
 def load_dataset():
     print('Loading dataset...')
 
-    return utils.Mol2PropertiesDataset(
+    return utils.Mol2SpecDataset(
             'bert_gnps',
             'data/pos_processed_gnps_shuffled_with_3d_train.tsv',
             parser=utils.gnps_parser,

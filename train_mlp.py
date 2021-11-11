@@ -9,9 +9,9 @@ from tqdm import tqdm
 def load_dataset():
     print('Loading dataset...')
 
-    return utils.Mol2PropertiesDataset(
+    return utils.Mol2SpecDataset(
             'mlp_gnps',
-            'data/pos_processed_gnps_shuffled_train.tsv',
+            'data/pos_processed_gnps_shuffled_with_3d_train.tsv',
             parser=utils.gnps_parser,
             mol_representation=utils.fingerprint,
             #from_mol=0,
@@ -25,7 +25,7 @@ def load_models(hparams):
     for hdim in hparams['hdim']:
         for n_layers in hparams['n_layers']:
             _models[f'mlp_hdim_{hdim}_layers_{n_layers}'] = models.Mol2SpecSimple(
-                    molecule_dim=utils.FINGERPRINT_NBITS,
+                    molecule_dim=utils.FINGERPRINT_NBITS + len(utils.FRAGMENT_LEVELS) + len(utils.ADDUCTS),
                     prop_dim=utils.SPECTRA_DIM,
                     hdim=hdim,
                     n_layers=n_layers

@@ -4,14 +4,11 @@ Stiched and forked from some of deepchem and https://www.kaggle.com/hd2019/using
 import os
 import torch
 from torch_geometric.data import Data
-from torch_geometric.data import InMemoryDataset
 from rdkit import Chem
 from rdkit.Chem import ChemicalFeatures
 from rdkit import RDConfig
 import numpy as np
 import networkx as nx
-import pathlib
-import pandas as pd
 
 
 ATOM_TYPES = [
@@ -162,7 +159,7 @@ def mol_to_nx(mol):
     return g
 
 
-def mol_to_torch_geom(mol, add_positions: bool = False):
+def mol_to_torch_geom(mol, add_positions: bool = False, **kwargs):
     g = mol_to_nx(mol)
     node_attr = node_features(g)
     edge_index, edge_attr = edge_features(g)
@@ -171,10 +168,12 @@ def mol_to_torch_geom(mol, add_positions: bool = False):
         pos = torch.FloatTensor(conformer.GetPositions())
     else:
         pos = None
+    kwargs = {k: torch.FloatTensor(v) for k, v in kwargs.items()}
     data = Data(
             x=node_attr,
             edge_index=edge_index,
             edge_attr=edge_attr,
-            pos=pos
+            pos=pos,
+            **kwargs
             )
     return data

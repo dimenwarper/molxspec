@@ -4,21 +4,20 @@ import graphs
 from training_setup import TrainingSetup, cli
 import torch_geometric
 import models
-from torch import optim
 from tqdm import tqdm
 
 
 def load_dataset():
     print('Loading dataset...')
 
-    return utils.Mol2PropertiesDataset(
+    return utils.Mol2SpecDataset(
             'graph_gnps',
-            'data/pos_processed_gnps_shuffled_train.tsv',
+            'data/pos_processed_gnps_shuffled_with_3d_train.tsv',
             parser=utils.gnps_parser,
             mol_representation=graphs.mol_to_torch_geom,
             #from_mol=0,
-            #to_mol=1000,
-            use_cache=True,
+            #to_mol=100,
+            #use_cache=True,
             )
 
 
@@ -28,7 +27,8 @@ def load_models(hparams):
     for hdim in hparams['hdim']:
         for n_layers in hparams['n_layers']:
             _models[f'graphconv_hdim_{hdim}_layers_{n_layers}'] = models.Mol2SpecGraph(
-                    molecule_dim=graphs.NUM_NODE_FEATURES,
+                    node_feature_dim=graphs.NUM_NODE_FEATURES,
+                    graph_feature_dim=len(utils.FRAGMENT_LEVELS) + len(utils.ADDUCTS),
                     prop_dim=utils.SPECTRA_DIM,
                     hdim=hdim,
                     n_layers=n_layers

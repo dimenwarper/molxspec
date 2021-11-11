@@ -36,7 +36,7 @@ def optimize(infname, sdffname, outfname, flen):
         open(f'{outfname}.failed', 'w') as failedfl, \
         open(outfname, 'w') as outfl:
         for i, line in tqdm(enumerate(fl), total=flen):
-            smiles = line.strip().split('\t')[1]
+            smiles = line.strip().split('\t')[-1]
             output = rdkit3d(smiles)
             if output is None:
                 failedfl.write(f'{i}\n')

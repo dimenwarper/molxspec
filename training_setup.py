@@ -76,6 +76,7 @@ class TrainingSetup:
             scheduler = None,
             swa = False,
             save_model = False, 
+            checkpoint = None
             ):
         self.model = model
         self.batch_size = batch_size
@@ -85,6 +86,7 @@ class TrainingSetup:
         self.swa = swa
         self.scheduler = scheduler
         self.train_data, self.test_data, self.validation_data = split_dataset(dataset)
+        self.checkpoint = None if checkpoint is None else torch.load(checkpoint)
 
         self.train_loader = dataloader(self.train_data, batch_size=self.batch_size, shuffle=True)
         self.test_loader = dataloader(self.test_data, batch_size=self.batch_size)
@@ -107,10 +109,15 @@ class TrainingSetup:
                 )
         else:
             scheduler = None
+        
+        if self.checkpoint is not None:
+            print('Loading checkpoint')
+            self.model.load_state_dict(self.checkpoint['model_state_dict'])
+            optimizer.load_state_dict(self.checkpoint['optimizer_state_dict'])
 
         losses = {'train': {}, 'test': {}}
         state_to_save = {'loss': np.inf}
-        for epoch in tqdm(range(self.n_epochs), desc='Epoch', leave=False):
+        for epoch in range(self.n_epochs):
             losses['train'][epoch] = 0
             losses['test'][epoch] = 0
             for inputs, targets in self.train_loader:
@@ -140,6 +147,7 @@ class TrainingSetup:
                         if self.save_model:
                             state_to_save['optimizer_state_dict'] = optimizer.state_dict()
                         state_to_save['loss'] = losses['test'][epoch]
+            print(f'Epoch: {epoch}: Loss train: [{losses["train"][epoch]}] | test: [{losses["test"][epoch]}]')
 
         if self.save_model:
             print(f'Epoch that was checkpointed: {state_to_save["epoch"]}')
