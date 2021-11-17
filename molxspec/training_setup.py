@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 import argparse
 
-import utils
+from molxspec import utils
 
 
 def cli(scan_hparams, prod_hparams):

@@ -11,35 +11,15 @@ from rdkit.Chem import DataStructs
 import numpy as np
 from typing import Callable, List, Any, Optional, Tuple, Dict, Collection, Union
 from tqdm import tqdm
-from transformers import AutoTokenizer
 
 MAX_MZ = 2000
 ADDUCTS = ['[M+H]+', '[M+Na]+', 'M+H', 'M-H', '[M-H2O+H]+', '[M-H]-', '[M+NH4]+', 'M+NH4', 'M+Na']
 RANDOM_SEED = 43242
 FINGERPRINT_NBITS = 1024
-CHEMBERTA_MODEL = 'seyonec/ChemBERTa-zinc-base-v1'
-CHEMBERTA_MAX_LEN = 300 # Natural products aren't that large
-__CHEMBERTA_TOKENIZER = None
+
 MAX_ION_SHIFT = 25
 FRAGMENT_LEVELS = [-4, -3, -2, -1, 0]
 SPECTRA_DIM = MAX_MZ * 2
-
-
-def chemberta_tokenizer() -> AutoTokenizer:
-    global __CHEMBERTA_TOKENIZER
-    if __CHEMBERTA_TOKENIZER is None:
-        __CHEMBERTA_TOKENIZER = AutoTokenizer.from_pretrained(CHEMBERTA_MODEL)
-    return __CHEMBERTA_TOKENIZER
-
-
-def chemberta_tokenize(mol) -> np.array:
-    return chemberta_tokenizer()(
-        Chem.MolToSmiles(mol), 
-        return_tensors='pt',
-        padding='max_length',
-        max_length=CHEMBERTA_MAX_LEN,
-        truncation=True
-        )
 
 
 def get_fragmentation_level(mol, spec):
@@ -56,7 +36,7 @@ def get_featurized_adducts(adduct):
 
 def get_featurized_fragmentation_level(mol, spec):
     fl = get_fragmentation_level(mol, spec)
-    flf = [int(fl <= FRAGMENT_LEVELS[0])] 
+    flf = [int(fl <= FRAGMENT_LEVELS[0])]
     flf += [int(FRAGMENT_LEVELS[i-1] <= fl <= FRAGMENT_LEVELS[i]) for i in range(1, len(FRAGMENT_LEVELS))]
     return np.array(flf)
 

@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
 import torch_geometric.nn as gnn
-import egnn
-import utils
-from transformers import AutoModelWithLMHead
-from itertools import chain
+from molxspec import egnn
 
 
 class ResBlock(nn.Module):
@@ -171,31 +168,4 @@ class Mol2SpecEGNN(nn.Module):
 
         x = torch.cat((x, frag_levels, adduct_feats), axis=1)
         x = self.head_layers(x)
-        return x
-
-
-class Mol2SpecBERT(nn.Module):
-    def __init__(self, prop_dim: int, hdim: int, n_layers: int):
-        super().__init__()
-        self.kwargs = dict(
-            prop_dim=prop_dim,
-            hdim=hdim,
-            n_layers=n_layers,
-        )
-        self.meta = nn.Parameter(torch.empty(0))
-        self.pretrained = AutoModelWithLMHead.from_pretrained(utils.CHEMBERTA_MODEL)
-        for param in self.pretrained.parameters():
-            param.requires_grad = False
-        self.in_dim = int(self.pretrained.lm_head.dense.in_features)
-        self.head = nn.Sequential(
-            nn.Linear(self.in_dim, hdim),
-            nn.SiLU(),
-            *chain(*[(nn.Linear(hdim, hdim), nn.SiLU()) for _ in range(n_layers)]), 
-            nn.Linear(hdim, prop_dim)
-        )
-    
-    def forward(self, x):
-        x = {k: v.to(self.meta.device).squeeze(dim=1) for k, v in x.items()}
-        x = self.pretrained(**x, output_hidden_states=True).hidden_states[-1].mean(axis=1)
-        x = self.head(x)
         return x

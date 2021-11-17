@@ -47,17 +47,17 @@ def optimize(infname, sdffname, outfname, flen):
 
 def main():
     optimize(
-        'data/pos_processed_gnps_shuffled_train.tsv',
-        'data/pos_processed_gnps_shuffled_with_3d_train.sdf',
-        'data/pos_processed_gnps_shuffled_with_3d_train.tsv',
-        145000,
+        '../data/pos_processed_gnps_shuffled_train.tsv',
+        '../data/pos_processed_gnps_shuffled_with_3d_train.sdf',
+        '../data/pos_processed_gnps_shuffled_with_3d_train.tsv',
+        140000,
     )
 
     optimize(
-        'data/pos_processed_gnps_shuffled_validation.tsv',
-        'data/pos_processed_gnps_shuffled_with_3d_validation.sdf',
-        'data/pos_processed_gnps_shuffled_with_3d_validation.tsv',
-        6000
+        '../data/pos_processed_gnps_shuffled_validation.tsv',
+        '../data/pos_processed_gnps_shuffled_with_3d_validation.sdf',
+        '../data/pos_processed_gnps_shuffled_with_3d_validation.tsv',
+        5000
     )
 
 
