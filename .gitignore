@@ -1,3 +1,7 @@
 data/*
 runs/*
+*/*__pycache__/*
 *__pycache__/*
+*.swo
+*.swp
+*ipynb_checkpoints
