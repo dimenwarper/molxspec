@@ -13,7 +13,7 @@ def load_dataset():
             parser=utils.gnps_parser,
             mol_representation=chemberta.chemberta_representation,
             #from_mol=0,
-            to_mol=50000,
+            #to_mol=50000,
             use_cache=True
             )
 

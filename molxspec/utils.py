@@ -30,14 +30,19 @@ def get_fragmentation_level(mol, spec):
     return np.log10(frag_level / _spec.sum())
 
 
+def get_featurized_fragmentation_level(frag_level: int) -> np.array:
+    flf = [int(frag_level <= FRAGMENT_LEVELS[0])]
+    flf += [int(FRAGMENT_LEVELS[i-1] <= frag_level <= FRAGMENT_LEVELS[i]) for i in range(1, len(FRAGMENT_LEVELS))]
+    return np.array(flf)
+
+
 def get_featurized_adducts(adduct):
     return np.array([int(adduct == ADDUCTS[i]) for i in range(len(ADDUCTS))])
 
 
-def get_featurized_fragmentation_level(mol, spec):
+def get_featurized_fragmentation_level_from_mol(mol, spec):
     fl = get_fragmentation_level(mol, spec)
-    flf = [int(fl <= FRAGMENT_LEVELS[0])]
-    flf += [int(FRAGMENT_LEVELS[i-1] <= fl <= FRAGMENT_LEVELS[i]) for i in range(1, len(FRAGMENT_LEVELS))]
+    return get_featurized_fragmentation_level(fl)
     return np.array(flf)
 
 
@@ -54,11 +59,13 @@ def encode_spec(spec):
     return vec
 
 
-def decode_spec(flatspec: np.array, lowest_intensity: float = 0) -> np.array:
+def decode_spec(flatspec: np.array, lowest_intensity: float = 0, make_relative: bool = False) -> np.array:
     intensities = flatspec[:len(flatspec) // 2]
     spln = sum(intensities > lowest_intensity)
     spec = np.zeros([spln, 2])
     spec[:, 1] = 10**(intensities[intensities > lowest_intensity]) - 1
+    if make_relative:
+        spec[:, 1] /= spec[:, 1].max()
     spec[:, 0] = np.where(intensities > lowest_intensity)[0] + (10**(flatspec[len(flatspec) // 2:][intensities > lowest_intensity]) - 1)
     return spec
 
@@ -149,7 +156,7 @@ class Mol2SpecDataset(Dataset):
             self.load()
         else:
             self.molecules, self.adducts, self.spectra = parser(fnames, from_mol=from_mol, to_mol=to_mol)
-            self.frag_levels = [get_featurized_fragmentation_level(mol, spec) for mol, spec in zip(self.molecules, self.spectra)]
+            self.frag_levels = [get_featurized_fragmentation_level_from_mol(mol, spec) for mol, spec in zip(self.molecules, self.spectra)]
             self.adduct_feats = [get_featurized_adducts(adduct) for adduct in self.adducts]
             self.mol_representation = mol_representation
             self.mol_rep_kwargs = mol_rep_kwargs if mol_rep_kwargs is not None else {}
