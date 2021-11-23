@@ -7,7 +7,7 @@ from molxspec import egnn
 
 
 class ResBlock(nn.Module):
-    def __init__(self, module: torch.Module):
+    def __init__(self, module: nn.Module):
         super().__init__()
         self.module = module
 
