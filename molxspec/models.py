@@ -1,15 +1,17 @@
+from typing import Any
 import torch
 import torch.nn as nn
+import torch_geometric
 import torch_geometric.nn as gnn
 from molxspec import egnn
 
 
 class ResBlock(nn.Module):
-    def __init__(self, module):
+    def __init__(self, module: torch.Module):
         super().__init__()
         self.module = module
 
-    def forward(self, inputs):
+    def forward(self, inputs: Any) -> torch.Tensor:
         return self.module(inputs) + inputs
 
 
@@ -44,7 +46,7 @@ class Mol2SpecSimple(nn.Module):
         )
 
 
-    def forward(self, mol_vec):
+    def forward(self, mol_vec: torch.Tensor) -> torch.Tensor:
         mol_vec = mol_vec.type(torch.FloatTensor).to(self.meta.device)
         mz_res = self.mlp_layers(mol_vec)
         return mz_res
@@ -100,7 +102,7 @@ class Mol2SpecGraph(nn.Module):
         )
 
 
-    def forward(self, gdata):
+    def forward(self, gdata: torch_geometric.data.Data) -> torch.Tensor:
         gdata = gdata.to(self.meta.device)
         x = self.gcn_layers(gdata.x, gdata.edge_index, gdata.batch)
 
@@ -157,7 +159,7 @@ class Mol2SpecEGNN(nn.Module):
             nn.Linear(hdim + graph_feature_dim, prop_dim),
         )
 
-    def forward(self, gdata):
+    def forward(self, gdata: torch_geometric.data.Data) -> torch.Tensor:
         gdata = gdata.to(self.meta.device)
         x, _ = self.egnn(gdata.x, gdata.pos, gdata.edge_index, gdata.edge_attr)
         x = self.pool_layers(x, gdata.batch)

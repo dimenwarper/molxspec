@@ -3,6 +3,7 @@ Stiched and forked from some of deepchem and https://www.kaggle.com/hd2019/using
 '''
 import os
 import torch
+import torch_geometric
 from torch_geometric.data import Data
 from rdkit import Chem
 from rdkit.Chem import ChemicalFeatures
@@ -67,7 +68,7 @@ NUM_EDGE_FEATURES = 4
 fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
 CHEM_FEATURE_FACTORY = ChemicalFeatures.BuildFeatureFactory(fdef_name)
 
-def node_features(g):
+def node_features(g: nx.DiGraph) -> torch.Tensor:
     feat = []
     for n, d in g.nodes(data=True):
         h_t = []
@@ -101,7 +102,7 @@ def node_features(g):
     return node_attr
 
 
-def edge_features(g):
+def edge_features(g: nx.DiGraph) -> torch.Tensor:
     e={}
     for n1, n2, d in g.edges(data=True):
         e_t = [int(d['b_type'] == x)
@@ -120,7 +121,7 @@ def edge_features(g):
 
 
 
-def mol_to_nx(mol):
+def mol_to_nx(mol: Chem.rdchem.Mol) -> nx.DiGraph:
     feats = CHEM_FEATURE_FACTORY.GetFeaturesForMol(mol)
 
     g = nx.DiGraph()
@@ -159,7 +160,7 @@ def mol_to_nx(mol):
     return g
 
 
-def mol_to_torch_geom(mol, add_positions: bool = False, **kwargs):
+def mol_to_torch_geom(mol, add_positions: bool = False, **kwargs) -> torch_geometric.data.Data:
     g = mol_to_nx(mol)
     node_attr = node_features(g)
     edge_index, edge_attr = edge_features(g)

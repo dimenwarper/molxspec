@@ -22,7 +22,7 @@ FRAGMENT_LEVELS = [-4, -3, -2, -1, 0]
 SPECTRA_DIM = MAX_MZ * 2
 
 
-def get_fragmentation_level(mol, spec):
+def get_fragmentation_level(mol: Chem.rdchem.Mol, spec: np.array) -> np.array:
     mass = ExactMolWt(mol)
     min_mass, max_mass = int(max(0, mass - MAX_ION_SHIFT)), int(min(mass + MAX_ION_SHIFT, MAX_MZ))
     _spec = 10 ** spec - 1
@@ -36,17 +36,16 @@ def get_featurized_fragmentation_level(frag_level: int) -> np.array:
     return np.array(flf)
 
 
-def get_featurized_adducts(adduct):
+def get_featurized_adducts(adduct: str) -> np.array:
     return np.array([int(adduct == ADDUCTS[i]) for i in range(len(ADDUCTS))])
 
 
-def get_featurized_fragmentation_level_from_mol(mol, spec):
+def get_featurized_fragmentation_level_from_mol(mol: Chem.rdchem.Mol, spec: np.array) -> np.array:
     fl = get_fragmentation_level(mol, spec)
     return get_featurized_fragmentation_level(fl)
-    return np.array(flf)
 
 
-def encode_spec(spec):
+def encode_spec(spec: np.array) -> np.array:
     vec = np.zeros(MAX_MZ * 2)
     for i in range(spec.shape[0]):
         mz_rnd = int(spec[i, 0])
@@ -70,7 +69,12 @@ def decode_spec(flatspec: np.array, lowest_intensity: float = 0, make_relative: 
     return spec
 
 
-def fingerprint(mol, frag_levels, adduct_feats, nbits=FINGERPRINT_NBITS) -> np.array:
+def fingerprint(
+    mol: Chem.rdchem.Mol, 
+    frag_levels: np.array, 
+    adduct_feats: np.array, 
+    nbits: int=FINGERPRINT_NBITS
+    ) -> np.array:
     fp = AllChem.GetHashedMorganFingerprint(mol, 2, nBits=nbits)
     mol_rep = np.zeros((0,))
     DataStructs.ConvertToNumpyArray(fp, mol_rep)
@@ -113,7 +117,7 @@ def gnps_parser_3d(fnames: Tuple[str, str], from_mol: int = 0, to_mol: Optional[
     return molecules[:len(spectra)], adducts, spectra
 
 
-def parse_spectra(line):
+def parse_spectra(line: str) -> Tuple[str, str, Chem.rdchem.Mol, np.array]:
     sid, adduct, spec_str, smiles = line.strip().split('\t')
     spec = np.array(json.loads(spec_str))
     if not( len(spec.shape) == 2 and spec.shape[0] >= 10 and (spec <= 0).sum() == 0):

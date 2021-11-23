@@ -35,9 +35,9 @@ def main():
     args = clargs()
     with open(args.smilesfile) as fl:
         smiless = [smiles.strip() for smiles in fl.readlines()]
-    specs = mol2spec.predict(smiless, -args.fraglevel, args.adduct, mol2spec.ModelType(args.model))
+    spec_dict = mol2spec.predict(smiless, -args.fraglevel, args.adduct, mol2spec.ModelType(args.model))
     with open(args.outfile, 'w') as ofl:
-        for smiles, spec in zip(smiless, specs):
+        for smiles, spec in spec_dict.items():
             ofl.write(f'{smiles}\t{spec.tolist()}\n')
     
 
