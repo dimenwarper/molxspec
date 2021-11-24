@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "molxspec"
 version = "0.1.0"
-description = ""
+description = "Machine learning models for predicting molecule <-> MS2 ESI spectra"
 authors = ["Pablo Cordero <dimenwarper@gmail.com>"]
 license = "MIT"
 
@@ -17,6 +17,9 @@ rdkit-pypi = "^2021.9.2"
 transformers = "^4.12.5"
 
 [tool.poetry.dev-dependencies]
+
+[tool.poetry.scripts]
+mol2spec = "molxspec.cli.mol2spec:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

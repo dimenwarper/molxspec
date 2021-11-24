@@ -68,17 +68,18 @@ def get_model_path(model_type: ModelType) -> str:
 
 
 def _download_models():
-    print('Downloading models...')
-    url = 'https://zenodo.org/record/5717415/files/models.tgz'
+    print('Downloading models, this will take a few minutes but it is only a one-time thing...')
+    url = 'https://github.com/dimenwarper/molxspec/releases/download/v.0.1.0/models.tgz'
     os.makedirs(get_model_dir(), exist_ok=True)
     print('Getting model files...')
-    archive = BytesIO(requests.get(url))
+    archive = BytesIO(requests.get(url).content)
     print('Unpacking...')
-    with tarfile(fileobj=archive) as tarf:
+    with tarfile.open(fileobj=archive) as tarf:
         for mf in tarf.getmembers():
             outfname = os.path.join(get_model_dir(), mf.name.split('/')[-1])
-            with open(outfname, 'w') as outf:
-                shutil.copyfileobj(mf, outf)
+            with open(outfname, 'wb') as outf:
+                shutil.copyfileobj(tarf.extractfile(mf), outf)
+    print('Done downloading models')
 
 
 def __load_model(model_type: ModelType):

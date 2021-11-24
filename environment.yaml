@@ -1,4 +1,4 @@
-name: molenv
+name: molxspec
 channels:
   - pyg
   - pytorch
