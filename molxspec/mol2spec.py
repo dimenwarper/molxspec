@@ -86,7 +86,7 @@ def __load_model(model_type: ModelType):
     model_path = get_model_path(model_type)
     if not os.path.exists(model_path):
         _download_models()
-    saved_state = torch.load(model_path)
+    saved_state = torch.load(model_path, map_location=torch.device('cpu'))
     model = MODEL_CLASSES[model_type](**saved_state['model_kwargs'])
     
     model.load_state_dict(saved_state['model_state_dict'])

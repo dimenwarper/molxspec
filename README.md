@@ -12,41 +12,31 @@ Machine learning models to convert molecules to ESI mass spectra (and maybe back
 
 ## Installation and usage
 
-If you just want to predict spectra, then the easiest way is to just pip install (we don't currently have this indexed in pypi due to non-pypi torch dependencies):
+You need to have `torch` and `torch_geometric` installed. I don't provide these as part of the dependencies since `torch_geometric` installs depends a lot on your CUDA and `torch` setup. To install `torch_geometric` from scratch [use their documentation](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html); e.g. can do it with pip using their wheels:
+
+```
+pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.9.0+cpu.html
+```
+
+Once `torch` and `torch_geometric` are installed, you can install `molxspec`:
 
 ```
 pip install https://github.com/dimenwarper/molxspec/releases/download/v.0.1.0/molxspec-0.1.0-py3-none-any.whl
 ```
 
-And then do it via command line:
+# Usage
+
+You can predict spectra from the command line:
 
 ```
 mol2spec --model [mlp | gcn | egnn | bert] input_smiles.txt output.txt
 ```
 
-Where `input_smiles.txt` is a file containing one molecule SMILES for each line
-First time use will download the pretrained models automatically
+Where `input_smiles.txt` is a file containing one molecule SMILES for each line. For the `egnn` model, molecules will have their 3D structure computed and optimized automatically using RDKit. First time use will download the pretrained models automatically, which can take some time, though it is a one-time thing only.
 
-You can also do it programmatically after you install:
+You can also predict spectra programmatically:
 
 ```python
 from molxspec import mol2spec
 dict_of_smiles_and_spectra = mol2spec.predict(list_of_smiles)
 ```
-
-## Installation fails
-
-Installation might fail if you are not on an x86 linux platform (e.g. colab):
-```
-ERROR: torch_sparse...is not a supported wheel on this platform.
-```
-
-in which case you might just want to clone the repository and create a conda environment with the provided `environment.yaml`:
-
-```
-git clone https://github.com/dimenwarper/molxspec.git
-cd molxspec
-conda env create --name molxspec --file=environments.yml
-conda activate molxspec
-```
-

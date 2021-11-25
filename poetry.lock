@@ -373,8 +373,7 @@ test = ["pytest", "pytest-runner", "pytest-cov", "scipy"]
 
 [package.source]
 type = "url"
-url = "https://data.pyg.org/whl/torch-1.9.0%2Bcu102/torch_cluster-1.5.9-cp39-cp39-linux_x86_64.whl"
-
+url = "https://data.pyg.org/whl/torch-1.9.0%2Bcu102/torch_cluster-1.5.9-cp37-cp37m-linux_x86_64.whl"
 [[package]]
 name = "torch-geometric"
 version = "2.0.2"
@@ -414,8 +413,7 @@ test = ["pytest", "pytest-runner", "pytest-cov"]
 
 [package.source]
 type = "url"
-url = "https://data.pyg.org/whl/torch-1.9.0%2Bcu102/torch_scatter-2.0.9-cp39-cp39-linux_x86_64.whl"
-
+url = "https://data.pyg.org/whl/torch-1.9.0%2Bcu102/torch_scatter-2.0.9-cp37-cp37m-linux_x86_64.whl"
 [[package]]
 name = "torch-sparse"
 version = "0.6.12"
@@ -432,8 +430,7 @@ test = ["pytest", "pytest-runner", "pytest-cov"]
 
 [package.source]
 type = "url"
-url = "https://data.pyg.org/whl/torch-1.9.0%2Bcu102/torch_sparse-0.6.12-cp39-cp39-linux_x86_64.whl"
-
+url = "https://data.pyg.org/whl/torch-1.9.0%2Bcu102/torch_sparse-0.6.12-cp37-cp37m-linux_x86_64.whl"
 [[package]]
 name = "torch-spline-conv"
 version = "1.2.1"
@@ -447,8 +444,7 @@ test = ["pytest", "pytest-runner", "pytest-cov"]
 
 [package.source]
 type = "url"
-url = "https://data.pyg.org/whl/torch-1.9.0%2Bcu102/torch_spline_conv-1.2.1-cp39-cp39-linux_x86_64.whl"
-
+url = "https://data.pyg.org/whl/torch-1.9.0%2Bcu102/torch_spline_conv-1.2.1-cp37-cp37m-linux_x86_64.whl"
 [[package]]
 name = "tqdm"
 version = "4.62.3"
@@ -557,7 +553,7 @@ PyYAML = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "adb93de814e69160ddc6700e75497e25bc5e3b1add2e2863ea993821cbf417ec"
+content-hash = "81afbfb2cac09738a14ceaf32316e90943e44625336274cd442e112b849cc5c9"
 
 [metadata.files]
 certifi = [
