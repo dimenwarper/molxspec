@@ -13,6 +13,8 @@ from typing import Callable, List, Any, Optional, Tuple, Dict, Collection, Union
 from tqdm import tqdm
 
 MAX_MZ = 2000
+# TODO In hindsight, I should have cleaned the data more here as e.g. M+H probably means [M+H]+, etc.
+# Also, M-H is unlikely to be there in positive mode....
 ADDUCTS = ['[M+H]+', '[M+Na]+', 'M+H', 'M-H', '[M-H2O+H]+', '[M-H]-', '[M+NH4]+', 'M+NH4', 'M+Na']
 RANDOM_SEED = 43242
 FINGERPRINT_NBITS = 1024
