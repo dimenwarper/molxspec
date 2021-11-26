@@ -137,7 +137,6 @@ def predict(
     mols = __mols_from_smiles(smiless)
     frag_feats = utils.get_featurized_fragmentation_level(frag_level)
     adduct_feats = utils.get_featurized_adducts(adduct)
-    print(frag_feats, adduct_feats)
     reps = None
     if model_type == ModelType.EGNN:
         # Molecules need to be optimized first for this model
