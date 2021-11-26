@@ -100,7 +100,12 @@ def __load_model(model_type: ModelType):
     return model
 
 
-def __do_prediction(reps: Collection[Any], model_type: ModelType) -> np.array:
+def __do_prediction(
+    reps: Collection[Any], 
+    model_type: ModelType,
+    lowest_intensity: float,
+    force_relative: bool
+    ) -> np.array:
     data = PredictionDataset(reps)
     if model_type in [ModelType.EGNN, ModelType.GCN]:
         dataloader = torch_geometric.loader.DataLoader
@@ -114,17 +119,25 @@ def __do_prediction(reps: Collection[Any], model_type: ModelType) -> np.array:
     for inputs in tqdm(loader, desc=f'Predicting (batches of {batch_size})'):
         preds.append(model(inputs).numpy())
     preds = [
-        utils.decode_spec(p, lowest_intensity=1e-4, make_relative=True)
+        utils.decode_spec(p, lowest_intensity=lowest_intensity, make_relative=force_relative)
         for pred in preds
         for p in pred
     ]
     return preds
 
 
-def predict(smiless: Collection[str], frag_level: int, adduct: str, model_type: ModelType) -> Dict[str, np.array]:
+def predict(
+    smiless: Collection[str], 
+    frag_level: int, 
+    adduct: str, 
+    model_type: ModelType,
+    lowest_intensity: float = 0.01,
+    force_relative: bool = True,
+    ) -> Dict[str, np.array]:
     mols = __mols_from_smiles(smiless)
     frag_feats = utils.get_featurized_fragmentation_level(frag_level)
     adduct_feats = utils.get_featurized_adducts(adduct)
+    print(frag_feats, adduct_feats)
     reps = None
     if model_type == ModelType.EGNN:
         # Molecules need to be optimized first for this model
@@ -134,4 +147,10 @@ def predict(smiless: Collection[str], frag_level: int, adduct: str, model_type: 
         reps = MOL_REPS[model_type](mols, frag_levels=frag_feats, adduct_feats=adduct_feats)
     else:
         reps = [MOL_REPS[model_type](m, frag_levels=frag_feats, adduct_feats=adduct_feats) for m in mols]
-    return {smiles: spec for smiles, spec in zip(smiless, __do_prediction(reps, model_type))}
+    return {
+        smiles: spec 
+        for smiles, spec in zip(
+            smiless, 
+            __do_prediction(reps, model_type, lowest_intensity, force_relative)
+            )
+        }
