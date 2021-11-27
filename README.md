@@ -10,7 +10,7 @@ Machine learning models to convert molecules to ESI mass spectra (and maybe back
 | egnn  | Equivariant GNN trained on (RDkit optimized) 3D structures  | 1024            | 2          |
 | bert  | MLP trained on representations from the (smaller) ChemBERTa SMILES model | 1024 | 6        |
 
-## Installation and usage
+## Installation
 
 You need to have `torch` and `torch_geometric` installed. I don't provide these as part of the dependencies since `torch_geometric` installs depends a lot on your CUDA and `torch` setup. To install `torch_geometric` from scratch [use their documentation](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html); e.g. can do it with pip using their wheels:
 
@@ -24,7 +24,7 @@ Once `torch` and `torch_geometric` are installed, you can install `molxspec`:
 pip install https://github.com/dimenwarper/molxspec/releases/download/v.0.1.0/molxspec-0.1.0-py3-none-any.whl
 ```
 
-# Usage
+## Usage
 
 You can predict spectra from the command line:
 
